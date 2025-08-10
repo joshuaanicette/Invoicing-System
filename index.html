@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Invoice Manager</title>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-4">
+    <div class="max-w-4xl mx-auto bg-white p-6 rounded-lg shadow">
+        <h1 class="text-2xl font-bold text-center text-gray-800 mb-4">Simple Invoice Manager</h1>
+
+        <!-- Toast Notification -->
+        <div id="toast" class="hidden fixed top-4 right-4 p-4 rounded text-white"></div>
+
+        <!-- Create/Modify Invoice Form -->
+        <div class="mb-6">
+            <h2 class="text-xl font-semibold mb-2">Create or Modify Invoice</h2>
+            <div class="space-y-2">
+                <input id="companyName" type="text" placeholder="Company Name" class="border p-2 rounded w-full">
+                <input id="companyAddress" type="text" placeholder="Company Address" class="border p-2 rounded w-full">
+                <input id="companyEmail" type="email" placeholder="Company Email" class="border p-2 rounded w-full">
+                <input id="invoiceDate" type="date" class="border p-2 rounded w-full">
+                <div id="customers" class="space-y-2">
+                    <div class="customer border p-4 rounded bg-gray-50">
+                        <input type="text" placeholder="Customer Name" class="customerName border p-2 rounded w-full mb-2">
+                        <input type="text" placeholder="Customer Address" class="customerAddress border p-2 rounded w-full mb-2">
+                        <input type="email" placeholder="Customer Email" class="customerEmail border p-2 rounded w-full mb-2">
+                        <div class="items space-y-2"></div>
+                        <button onclick="addItem(this)" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 mt-2">Add Item</button>
+                        <button onclick="removeCustomer(this)" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 mt-2">Remove Customer</button>
+                    </div>
+                </div>
+                <button onclick="addCustomer()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Add Customer</button>
+                <div class="flex space-x-2">
+                    <button onclick="createInvoice()" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">Create Invoice</button>
+                    <input id="modifyInvoiceNumber" type="number" placeholder="Invoice Number to Modify" class="border p-2 rounded">
+                    <button onclick="loadInvoice()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Load Invoice</button>
+                    <button onclick="modifyInvoice()" class="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600">Modify Invoice</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Delete Invoice -->
+        <div class="mb-6">
+            <h2 class="text-xl font-semibold mb-2">Delete Invoice</h2>
+            <div class="flex space-x-2">
+                <input id="deleteInvoiceNumber" type="number" placeholder="Invoice Number to Delete" class="border p-2 rounded flex-grow">
+                <button onclick="deleteInvoice()" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">Delete</button>
+            </div>
+        </div>
+
+        <!-- Categorize Invoices -->
+        <div class="mb-6">
+            <h2 class="text-xl font-semibold mb-2">View Invoices</h2>
+            <select id="categorizePeriod" class="border p-2 rounded mb-2">
+                <option value="year">Year</option>
+                <option value="month">Month</option>
+                <option value="day">Day</option>
+            </select>
+            <div id="invoicesTable" class="overflow-x-auto">
+                <table class="min-w-full bg-white border rounded">
+                    <thead>
+                        <tr class="bg-gray-200">
+                            <th class="p-2 text-left">Period</th>
+                            <th class="p-2 text-left">Invoice #</th>
+                            <th class="p-2 text-left">Date</th>
+                            <th class="p-2 text-left">Customers</th>
+                            <th class="p-2 text-left">Total</th>
+                            <th class="p-2 text-left">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="invoicesBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Reset Invoice Number -->
+        <div>
+            <h2 class="text-xl font-semibold mb-2">Reset Invoice Number</h2>
+            <button onclick="resetInvoiceNumber()" class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600">Reset Counter</button>
+        </div>
+    </div>
+
+    <script>
+        const { jsPDF } = window.jspdf;
+
+        // In-memory Invoice Manager
+        const manager = {
+            invoices: [],
+            nextInvoiceNumber: 1001,
+
+            storeInvoice(invoiceNumber, invoiceDate, company, customers) {
+                const totalAmount = customers.reduce((total, customer) => 
+                    total + customer.items.reduce((sum, item) => 
+                        sum + item.quantity * item.unit_price, 0), 0);
+                this.invoices.push({
+                    invoiceNumber,
+                    creationDate: invoiceDate,
+                    companyName: company.name,
+                    companyAddress: company.address,
+                    companyEmail: company.email,
+                    customers,
+                    totalAmount
+                });
+                this.nextInvoiceNumber = Math.max(this.nextInvoiceNumber, invoiceNumber + 1);
+            },
+
+            retrieveInvoice(invoiceNumber) {
+                return this.invoices.find(inv => inv.invoiceNumber === invoiceNumber) || {};
+            },
+
+            categorizeInvoicesByDate(period) {
+                const categorized = {};
+                this.invoices.forEach(invoice => {
+                    const date = new Date(invoice.creationDate);
+                    let key;
+                    if (period === 'year') {
+                        key = date.getFullYear().toString();
+                    } else if (period === 'month') {
+                        key = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+                    } else {
+                        key = invoice.creationDate;
+                    }
+                    if (!categorized[key]) categorized[key] = [];
+                    categorized[key].push(invoice);
+                });
+                return categorized;
+            },
+
+            deleteInvoice(invoiceNumber) {
+                const index = this.invoices.findIndex(inv => inv.invoiceNumber === invoiceNumber);
+                if (index !== -1) {
+                    this.invoices.splice(index, 1);
+                    this.resetInvoiceNumber();
+                    return true;
+                }
+                return false;
+            },
+
+            resetInvoiceNumber() {
+                if (this.invoices.length > 0) {
+                    this.nextInvoiceNumber = Math.max(...this.invoices.map(inv => inv.invoiceNumber)) + 1;
+                } else {
+                    this.nextInvoiceNumber = 1001;
+                }
+            },
+
+            getNextInvoiceNumber() {
+                return this.nextInvoiceNumber++;
+            }
+        };
+
+        // Generate PDF
+        function generatePDF(invoice) {
+            const doc = new jsPDF();
+            let y = 20;
+
+            doc.setFontSize(20);
+            doc.setFont('helvetica', 'bold');
+            doc.text('INVOICE', 20, y);
+            y += 10;
+
+            doc.setFontSize(12);
+            doc.setFont('helvetica', 'normal');
+            doc.text(`Invoice #: ${invoice.invoiceNumber}`, 20, y);
+            doc.text(`Date: ${invoice.creationDate}`, 20, y + 5);
+            y += 15;
+
+            doc.setFont('helvetica', 'bold');
+            doc.text(invoice.companyName || 'Your Company', 120, y);
+            doc.setFont('helvetica', 'normal');
+            doc.text(invoice.companyAddress || '', 120, y + 5);
+            doc.text(invoice.companyEmail || '', 120, y + 10);
+            y += 20;
+
+            invoice.customers.forEach(customer => {
+                doc.setFont('helvetica', 'bold');
+                doc.text(`Bill To: ${customer.name}`, 20, y);
+                doc.setFont('helvetica', 'normal');
+                doc.text(customer.address || '', 20, y + 5);
+                doc.text(customer.email || '', 20, y + 10);
+                y += 20;
+
+                doc.setFont('helvetica', 'bold');
+                doc.text('Description', 20, y);
+                doc.text('Quantity', 80, y);
+                doc.text('Unit Price', 110, y);
+                doc.text('Total', 150, y);
+                doc.line(20, y + 2, 190, y + 2);
+                y += 10;
+
+                doc.setFont('helvetica', 'normal');
+                let customerTotal = 0;
+                customer.items.forEach(item => {
+                    doc.text(item.description, 20, y);
+                    doc.text(item.quantity.toString(), 80, y);
+                    doc.text(`$${item.unit_price.toFixed(2)}`, 110, y);
+                    const itemTotal = item.quantity * item.unit_price;
+                    doc.text(`$${itemTotal.toFixed(2)}`, 150, y);
+                    customerTotal += itemTotal;
+                    y += 10;
+                });
+
+                doc.setFont('helvetica', 'bold');
+                doc.text(`Subtotal for ${customer.name}:`, 20, y);
+                doc.setFont('helvetica', 'normal');
+                doc.text(`$${customerTotal.toFixed(2)}`, 150, y);
+                y += 15;
+            });
+
+            doc.setFont('helvetica', 'bold');
+            doc.text('Grand Total:', 20, y);
+            doc.setFont('helvetica', 'normal');
+            doc.text(`$${invoice.totalAmount.toFixed(2)}`, 150, y);
+
+            doc.save(`invoice_${invoice.invoiceNumber}.pdf`);
+        }
+
+        // Show Toast
+        function showToast(message, type) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `fixed top-4 right-4 p-4 rounded text-white ${type === 'success' ? 'bg-green-500' : 'bg-red-500'}`;
+            toast.classList.remove('hidden');
+            setTimeout(() => toast.classList.add('hidden'), 3000);
+        }
+
+        // Add Customer
+        function addCustomer() {
+            const customersDiv = document.getElementById('customers');
+            const customerDiv = document.createElement('div');
+            customerDiv.className = 'customer border p-4 rounded bg-gray-50';
+            customerDiv.innerHTML = `
+                <input type="text" placeholder="Customer Name" class="customerName border p-2 rounded w-full mb-2">
+                <input type="text" placeholder="Customer Address" class="customerAddress border p-2 rounded w-full mb-2">
+                <input type="email" placeholder="Customer Email" class="customerEmail border p-2 rounded w-full mb-2">
+                <div class="items space-y-2"></div>
+                <button onclick="addItem(this)" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 mt-2">Add Item</button>
+                <button onclick="removeCustomer(this)" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 mt-2">Remove Customer</button>
+            `;
+            customersDiv.appendChild(customerDiv);
+        }
+
+        // Add Item
+        function addItem(button) {
+            const itemsDiv = button.parentElement.querySelector('.items');
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'flex space-x-2';
+            itemDiv.innerHTML = `
+                <input type="text" placeholder="Description" class="itemDescription border p-2 rounded flex-grow">
+                <input type="number" placeholder="Quantity" value="1" class="itemQuantity border p-2 rounded w-24">
+                <input type="number" placeholder="Unit Price" value="0" class="itemUnitPrice border p-2 rounded w-24">
+                <button onclick="removeItem(this)" class="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">Remove</button>
+            `;
+            itemsDiv.appendChild(itemDiv);
+        }
+
+        // Remove Customer
+        function removeCustomer(button) {
+            const customersDiv = document.getElementById('customers');
+            if (customersDiv.children.length > 1) {
+                button.parentElement.remove();
+            } else {
+                showToast('At least one customer is required.', 'error');
+            }
+        }
+
+        // Remove Item
+        function removeItem(button) {
+            button.parentElement.remove();
+        }
+
+        // Load Invoice
+        function loadInvoice() {
+            const invoiceNumber = parseInt(document.getElementById('modifyInvoiceNumber').value);
+            if (!invoiceNumber) {
+                showToast('Please enter an invoice number.', 'error');
+                return;
+            }
+            const invoice = manager.retrieveInvoice(invoiceNumber);
+            if (!invoice.invoiceNumber) {
+                showToast(`Invoice ${invoiceNumber} not found.`, 'error');
+                return;
+            }
+
+            document.getElementById('companyName').value = invoice.companyName || '';
+            document.getElementById('companyAddress').value = invoice.companyAddress || '';
+            document.getElementById('companyEmail').value = invoice.companyEmail || '';
+            document.getElementById('invoiceDate').value = invoice.creationDate || '';
+
+            const customersDiv = document.getElementById('customers');
+            customersDiv.innerHTML = '';
+            invoice.customers.forEach(customer => {
+                const customerDiv = document.createElement('div');
+                customerDiv.className = 'customer border p-4 rounded bg-gray-50';
+                customerDiv.innerHTML = `
+                    <input type="text" placeholder="Customer Name" class="customerName border p-2 rounded w-full mb-2" value="${customer.name || ''}">
+                    <input type="text" placeholder="Customer Address" class="customerAddress border p-2 rounded w-full mb-2" value="${customer.address || ''}">
+                    <input type="email" placeholder="Customer Email" class="customerEmail border p-2 rounded w-full mb-2" value="${customer.email || ''}">
+                    <div class="items space-y-2"></div>
+                    <button onclick="addItem(this)" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 mt-2">Add Item</button>
+                    <button onclick="removeCustomer(this)" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 mt-2">Remove Customer</button>
+                `;
+                customersDiv.appendChild(customerDiv);
+                const itemsDiv = customerDiv.querySelector('.items');
+                customer.items.forEach(item => {
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'flex space-x-2';
+                    itemDiv.innerHTML = `
+                        <input type="text" placeholder="Description" class="itemDescription border p-2 rounded flex-grow" value="${item.description || ''}">
+                        <input type="number" placeholder="Quantity" value="${item.quantity || 1}" class="itemQuantity border p-2 rounded w-24">
+                        <input type="number" placeholder="Unit Price" value="${item.unit_price || 0}" class="itemUnitPrice border p-2 rounded w-24">
+                        <button onclick="removeItem(this)" class="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">Remove</button>
+                    `;
+                    itemsDiv.appendChild(itemDiv);
+                });
+            });
+            showToast(`Invoice ${invoiceNumber} loaded for modification.`, 'success');
+        }
+
+        // Create Invoice
+        function createInvoice() {
+            const company = {
+                name: document.getElementById('companyName').value,
+                address: document.getElementById('companyAddress').value,
+                email: document.getElementById('companyEmail').value
+            };
+            const invoiceDate = document.getElementById('invoiceDate').value || new Date().toISOString().split('T')[0];
+            const customers = Array.from(document.getElementsByClassName('customer')).map(customerDiv => ({
+                name: customerDiv.querySelector('.customerName').value,
+                address: customerDiv.querySelector('.customerAddress').value,
+                email: customerDiv.querySelector('.customerEmail').value,
+                items: Array.from(customerDiv.querySelectorAll('.items > div')).map(itemDiv => ({
+                    description: itemDiv.querySelector('.itemDescription').value,
+                    quantity: parseFloat(itemDiv.querySelector('.itemQuantity').value) || 1,
+                    unit_price: parseFloat(itemDiv.querySelector('.itemUnitPrice').value) || 0
+                }))
+            }));
+
+            if (customers.length === 0 || !customers[0].name || customers.every(c => c.items.length === 0)) {
+                showToast('At least one customer with items is required.', 'error');
+                return;
+            }
+
+            const invoiceNumber = manager.getNextInvoiceNumber();
+            const invoice = {
+                invoiceNumber,
+                creationDate: invoiceDate,
+                companyName: company.name,
+                companyAddress: company.address,
+                companyEmail: company.email,
+                customers,
+                totalAmount: customers.reduce((total, customer) => 
+                    total + customer.items.reduce((sum, item) => 
+                        sum + item.quantity * item.unit_price, 0), 0)
+            };
+
+            manager.storeInvoice(invoiceNumber, invoiceDate, company, customers);
+            generatePDF(invoice);
+            clearForm();
+            showToast(`Invoice ${invoiceNumber} created and PDF downloaded.`, 'success');
+            updateInvoicesTable();
+        }
+
+        // Modify Invoice
+        function modifyInvoice() {
+            const invoiceNumber = parseInt(document.getElementById('modifyInvoiceNumber').value);
+            if (!invoiceNumber) {
+                showToast('Please enter an invoice number.', 'error');
+                return;
+            }
+            const existingInvoice = manager.retrieveInvoice(invoiceNumber);
+            if (!existingInvoice.invoiceNumber) {
+                showToast(`Invoice ${invoiceNumber} not found.`, 'error');
+                return;
+            }
+
+            const company = {
+                name: document.getElementById('companyName').value || existingInvoice.companyName,
+                address: document.getElementById('companyAddress').value || existingInvoice.companyAddress,
+                email: document.getElementById('companyEmail').value || existingInvoice.companyEmail
+            };
+            const invoiceDate = document.getElementById('invoiceDate').value || existingInvoice.creationDate;
+            const customers = Array.from(document.getElementsByClassName('customer')).map(customerDiv => ({
+                name: customerDiv.querySelector('.customerName').value,
+                address: customerDiv.querySelector('.customerAddress').value,
+                email: customerDiv.querySelector('.customerEmail').value,
+                items: Array.from(customerDiv.querySelectorAll('.items > div')).map(itemDiv => ({
+                    description: itemDiv.querySelector('.itemDescription').value,
+                    quantity: parseFloat(itemDiv.querySelector('.itemQuantity').value) || 1,
+                    unit_price: parseFloat(itemDiv.querySelector('.itemUnitPrice').value) || 0
+                }))
+            }));
+
+            // Use existing customers if no new ones are provided
+            const finalCustomers = (customers.length === 0 || !customers[0].name) ? existingInvoice.customers : customers;
+            if (finalCustomers.every(c => c.items.length === 0)) {
+                showToast('At least one customer with items is required.', 'error');
+                return;
+            }
+
+            manager.deleteInvoice(invoiceNumber);
+            const invoice = {
+                invoiceNumber,
+                creationDate: invoiceDate,
+                companyName: company.name,
+                companyAddress: company.address,
+                companyEmail: company.email,
+                customers: finalCustomers,
+                totalAmount: finalCustomers.reduce((total, customer) => 
+                    total + customer.items.reduce((sum, item) => 
+                        sum + item.quantity * item.unit_price, 0), 0)
+            };
+
+            manager.storeInvoice(invoiceNumber, invoiceDate, company, finalCustomers);
+            generatePDF(invoice);
+            clearForm();
+            document.getElementById('modifyInvoiceNumber').value = '';
+            showToast(`Invoice ${invoiceNumber} modified and PDF downloaded.`, 'success');
+            updateInvoicesTable();
+        }
+
+        // Delete Invoice
+        function deleteInvoice() {
+            const invoiceNumber = parseInt(document.getElementById('deleteInvoiceNumber').value);
+            if (!invoiceNumber) {
+                showToast('Please enter an invoice number.', 'error');
+                return;
+            }
+            if (manager.deleteInvoice(invoiceNumber)) {
+                showToast(`Invoice ${invoiceNumber} deleted.`, 'success');
+                document.getElementById('deleteInvoiceNumber').value = '';
+                updateInvoicesTable();
+            } else {
+                showToast(`Invoice ${invoiceNumber} not found.`, 'error');
+            }
+        }
+
+        // Reset Invoice Number
+        function resetInvoiceNumber() {
+            manager.resetInvoiceNumber();
+            showToast(`Invoice number counter reset to ${manager.nextInvoiceNumber}.`, 'success');
+            updateInvoicesTable();
+        }
+
+        // Update Invoices Table
+        function updateInvoicesTable() {
+            const period = document.getElementById('categorizePeriod').value;
+            const invoicesBody = document.getElementById('invoicesBody');
+            invoicesBody.innerHTML = '';
+            const categorized = manager.categorizeInvoicesByDate(period);
+            for (const [periodKey, invoices] of Object.entries(categorized)) {
+                invoices.forEach(invoice => {
+                    const row = document.createElement('tr');
+                    row.className = 'border-t';
+                    row.innerHTML = `
+                        <td class="p-2">${periodKey}</td>
+                        <td class="p-2">${invoice.invoiceNumber}</td>
+                        <td class="p-2">${invoice.creationDate}</td>
+                        <td class="p-2">${invoice.customers.map(c => `${c.name} (${c.items.length} items)`).join(', ')}</td>
+                        <td class="p-2">$${invoice.totalAmount.toFixed(2)}</td>
+                        <td class="p-2">
+                            <button onclick="generatePDF(manager.invoices.find(inv => inv.invoiceNumber === ${invoice.invoiceNumber}))" class="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600">Download PDF</button>
+                        </td>
+                    `;
+                    invoicesBody.appendChild(row);
+                });
+            }
+        }
+
+        // Clear Form
+        function clearForm() {
+            document.getElementById('companyName').value = '';
+            document.getElementById('companyAddress').value = '';
+            document.getElementById('companyEmail').value = '';
+            document.getElementById('invoiceDate').value = '';
+            const customersDiv = document.getElementById('customers');
+            customersDiv.innerHTML = `
+                <div class="customer border p-4 rounded bg-gray-50">
+                    <input type="text" placeholder="Customer Name" class="customerName border p-2 rounded w-full mb-2">
+                    <input type="text" placeholder="Customer Address" class="customerAddress border p-2 rounded w-full mb-2">
+                    <input type="email" placeholder="Customer Email" class="customerEmail border p-2 rounded w-full mb-2">
+                    <div class="items space-y-2"></div>
+                    <button onclick="addItem(this)" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 mt-2">Add Item</button>
+                    <button onclick="removeCustomer(this)" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 mt-2">Remove Customer</button>
+                </div>
+            `;
+        }
+
+        // Initialize
+        document.getElementById('categorizePeriod').addEventListener('change', updateInvoicesTable);
+        updateInvoicesTable();
+    </script>
+</body>
+</html>
