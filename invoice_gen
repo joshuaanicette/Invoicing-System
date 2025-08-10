@@ -1,0 +1,346 @@
+import os
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+from reportlab.lib.units import inch
+from datetime import datetime
+from invoice_manager import InvoiceManager
+
+def get_next_invoice_number():
+    """Retrieve and increment the invoice number from a file."""
+    invoice_file = "last_invoice.txt"
+    if os.path.exists(invoice_file):
+        with open(invoice_file, "r") as f:
+            last_number = int(f.read().strip())
+    else:
+        last_number = 1000  # Starting invoice number
+    next_number = last_number + 1
+    with open(invoice_file, "w") as f:
+        f.write(str(next_number))
+    return next_number
+
+def reset_invoice_number(manager):
+    """Reset the invoice number counter to the highest existing invoice number or 1000."""
+    invoices = manager.retrieve_all_invoices()
+    if invoices:
+        max_invoice_number = max(invoice['invoice_number'] for invoice in invoices)
+    else:
+        max_invoice_number = 1000  # Default starting number
+    with open("last_invoice.txt", "w") as f:
+        f.write(str(max_invoice_number))
+    print(f"Invoice number counter reset to {max_invoice_number}.")
+
+def get_company_details():
+    """Prompt user for company details."""
+    print("Enter your company details:")
+    name = input("Company Name: ")
+    address = input("Company Address: ")
+    email = input("Company Email: ")
+    return {
+        "name": name,
+        "address": address,
+        "email": email
+    }
+
+def get_customer_details():
+    """Prompt user for multiple customer details with their specific items."""
+    customers = []
+    while True:
+        print("\nEnter customer details (leave name blank to finish):")
+        name = input("Customer Name: ")
+        if not name:
+            break
+        address = input("Customer Address: ")
+        email = input("Customer Email: ")
+        print(f"\nEnter items for {name} (leave description blank to finish):")
+        items = []
+        while True:
+            description = input("Description: ")
+            if not description:
+                break
+            try:
+                quantity = int(input("Quantity: "))
+                unit_price = float(input("Unit Price: "))
+                items.append({
+                    "description": description,
+                    "quantity": quantity,
+                    "unit_price": unit_price
+                })
+            except ValueError:
+                print("Invalid input for quantity or unit price. Please try again.")
+        customers.append({
+            "name": name,
+            "address": address,
+            "email": email,
+            "items": items
+        })
+    return customers
+
+def get_invoice_date():
+    """Prompt user for invoice date (YYYY-MM-DD) or use current date."""
+    while True:
+        date_input = input("\nEnter invoice date (YYYY-MM-DD) or press Enter for current date: ")
+        if not date_input:
+            return datetime.now().strftime("%Y-%m-%d")
+        try:
+            datetime.strptime(date_input, "%Y-%m-%d")
+            return date_input
+        except ValueError:
+            print("Invalid date format. Please use YYYY-MM-DD (e.g., 2025-07-29)")
+
+def create_invoice(company, customers, invoice_number, invoice_date, manager):
+    """Generate a PDF invoice with customer-specific items and store it in the database."""
+    output_filename = f"invoice_{invoice_number}.pdf"
+    
+    c = canvas.Canvas(output_filename, pagesize=letter)
+    width, height = letter
+    
+    # Header
+    c.setFont("Helvetica-Bold", 20)
+    c.drawString(1 * inch, height - 1 * inch, "INVOICE")
+    
+    # Invoice Details
+    c.setFont("Helvetica", 12)
+    c.drawString(1 * inch, height - 1.5 * inch, f"Invoice #: {invoice_number}")
+    c.drawString(1 * inch, height - 1.75 * inch, f"Date: {invoice_date}")
+    
+    # Company Info
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(4 * inch, height - 1.5 * inch, company["name"])
+    c.setFont("Helvetica", 12)
+    c.drawString(4 * inch, height - 1.75 * inch, company["address"])
+    c.drawString(4 * inch, height - 2 * inch, company["email"])
+    
+    # Customer and Item Details
+    y = height - 2.5 * inch
+    total = 0
+    for customer in customers:
+        # Customer Header
+        c.setFont("Helvetica-Bold", 12)
+        c.drawString(1 * inch, y, f"Bill To: {customer['name']}")
+        c.setFont("Helvetica", 12)
+        c.drawString(1 * inch, y - 0.25 * inch, customer["address"])
+        c.drawString(1 * inch, y - 0.5 * inch, customer["email"])
+        y -= 0.75 * inch
+        
+        # Table Header for Customer's Items
+        c.setFont("Helvetica-Bold", 12)
+        c.drawString(1 * inch, y, "Description")
+        c.drawString(3 * inch, y, "Quantity")
+        c.drawString(4 * inch, y, "Unit Price")
+        c.drawString(5 * inch, y, "Total")
+        c.line(1 * inch, y - 0.1 * inch, 6 * inch, y - 0.1 * inch)
+        
+        # Table Content
+        c.setFont("Helvetica", 12)
+        y -= 0.4 * inch
+        customer_total = 0
+        for item in customer["items"]:
+            c.drawString(1 * inch, y, item["description"])
+            c.drawString(3 * inch, y, str(item["quantity"]))
+            c.drawString(4 * inch, y, f"${item['unit_price']:.2f}")
+            item_total = item["quantity"] * item["unit_price"]
+            c.drawString(5 * inch, y, f"${item_total:.2f}")
+            customer_total += item_total
+            y -= 0.3 * inch
+        
+        # Customer Subtotal
+        c.setFont("Helvetica-Bold", 12)
+        c.drawString(1 * inch, y - 0.3 * inch, f"Subtotal for {customer['name']}:")
+        c.setFont("Helvetica", 12)
+        c.drawString(5 * inch, y - 0.3 * inch, f"${customer_total:.2f}")
+        total += customer_total
+        y -= 0.6 * inch
+    
+    # Grand Total
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(1 * inch, y - 0.3 * inch, "Grand Total:")
+    c.setFont("Helvetica", 12)
+    c.drawString(5 * inch, y - 0.3 * inch, f"${total:.2f}")
+    
+    c.showPage()
+    c.save()
+    
+    # Store invoice in the database
+    manager.store_invoice(invoice_number, invoice_date, company, customers)
+    return invoice_number
+
+def modify_invoice(manager):
+    """Modify an existing invoice, allowing changes to item descriptions, quantities, prices, and date."""
+    try:
+        invoice_number = int(input("Enter invoice number to modify: "))
+        existing_invoice = manager.retrieve_invoice(invoice_number)
+        if not existing_invoice:
+            print(f"Invoice {invoice_number} not found.")
+            return
+        
+        print(f"\nModifying Invoice #{invoice_number}")
+        print("Current details:")
+        print(f"  Date: {existing_invoice['creation_date']}")
+        print(f"  Company: {existing_invoice['company_name']}")
+        print("  Customers and Items:")
+        for customer in existing_invoice['customers']:
+            print(f"    Name: {customer['name']}, Address: {customer['address']}, Email: {customer['email']}")
+            print("    Items:")
+            for item in customer["items"]:
+                print(f"      {item['description']}: {item['quantity']} x ${item['unit_price']:.2f}")
+        print(f"  Total: ${existing_invoice['total_amount']:.2f}")
+        
+        # Prompt for new invoice date
+        print("\nEnter new invoice date (press Enter to keep current date):")
+        invoice_date = get_invoice_date()
+        if not invoice_date:
+            invoice_date = existing_invoice["creation_date"]
+        
+        # Prompt for customer modifications
+        customers = []
+        for idx, customer in enumerate(existing_invoice["customers"], 1):
+            print(f"\nEditing Customer {idx}: {customer['name']}")
+            print("Press Enter to keep current values or enter new values.")
+            name = input(f"Customer Name [{customer['name']}]: ") or customer["name"]
+            address = input(f"Customer Address [{customer['address']}]: ") or customer["address"]
+            email = input(f"Customer Email [{customer['email']}]: ") or customer["email"]
+            
+            # Edit existing items
+            items = []
+            print(f"\nEditing items for {name} (leave description blank to finish):")
+            for item_idx, item in enumerate(customer["items"], 1):
+                print(f"  Item {item_idx}: {item['description']}, Quantity: {item['quantity']}, Unit Price: ${item['unit_price']:.2f}")
+                description = input(f"Description [{item['description']}]: ") or item["description"]
+                quantity_input = input(f"Quantity [{item['quantity']}]: ") or str(item["quantity"])
+                unit_price_input = input(f"Unit Price [{item['unit_price']}]: ") or str(item["unit_price"])
+                try:
+                    quantity = int(quantity_input)
+                    unit_price = float(unit_price_input)
+                    items.append({
+                        "description": description,
+                        "quantity": quantity,
+                        "unit_price": unit_price
+                    })
+                except ValueError:
+                    print("Invalid input for quantity or unit price. Keeping original values.")
+                    items.append(item)
+            
+            # Allow adding new items
+            print("\nAdd new items for this customer (leave description blank to finish):")
+            while True:
+                description = input("Description: ")
+                if not description:
+                    break
+                try:
+                    quantity = int(input("Quantity: "))
+                    unit_price = float(input("Unit Price: "))
+                    items.append({
+                        "description": description,
+                        "quantity": quantity,
+                        "unit_price": unit_price
+                    })
+                except ValueError:
+                    print("Invalid input for quantity or unit price. Item not added.")
+            
+            customers.append({
+                "name": name,
+                "address": address,
+                "email": email,
+                "items": items
+            })
+        
+        # Allow adding new customers
+        print("\nAdd new customers (leave name blank to finish):")
+        customers.extend(get_customer_details())
+        
+        if not customers or not any(customer["items"] for customer in customers):
+            print("At least one customer with items is required. Invoice not modified.")
+            return
+        
+        # Delete old invoice
+        manager.delete_invoice(invoice_number)
+        
+        # Generate new invoice with updated details
+        company = {"name": existing_invoice["company_name"], "address": "", "email": ""}
+        create_invoice(company, customers, invoice_number, invoice_date, manager)
+        print(f"Invoice {invoice_number} modified and regenerated.")
+        
+        # Reset invoice number counter
+        reset_invoice_number(manager)
+    except ValueError:
+        print("Invalid invoice number.")
+
+def delete_invoice(manager):
+    """Delete an invoice by number and adjust invoice number counter."""
+    try:
+        invoice_number = int(input("Enter invoice number to delete: "))
+        if manager.delete_invoice(invoice_number):
+            print(f"Invoice {invoice_number} deleted.")
+            # Optionally delete the PDF file
+            pdf_file = f"invoice_{invoice_number}.pdf"
+            if os.path.exists(pdf_file):
+                os.remove(pdf_file)
+                print(f"PDF file {pdf_file} deleted.")
+            # Reset invoice number counter
+            reset_invoice_number(manager)
+        else:
+            print(f"Invoice {invoice_number} not found.")
+    except ValueError:
+        print("Invalid invoice number.")
+
+def display_categorized_invoices(manager):
+    """Display invoices categorized by year, month, or day."""
+    period = input("Categorize by (year/month/day): ").lower()
+    if period not in ["year", "month", "day"]:
+        print("Invalid period. Using 'month' as default.")
+        period = "month"
+    
+    categorized = manager.categorize_invoices_by_date(period)
+    if not categorized:
+        print("No invoices found.")
+        return
+    
+    for period_key, invoices in categorized.items():
+        print(f"\n{period.capitalize()}: {period_key}")
+        for invoice in invoices:
+            customer_summary = ", ".join(f"{customer['name']} ({len(customer['items'])} items)" for customer in invoice['customers'])
+            print(f"  Invoice #{invoice['invoice_number']} - Date: {invoice['creation_date']}, "
+                  f"Customers: {customer_summary}, Total: ${invoice['total_amount']:.2f}")
+
+def main_menu():
+    """Display the main menu and handle user choices."""
+    manager = InvoiceManager()
+    while True:
+        print("\n=== Invoice Management System ===")
+        print("1. Create new invoice")
+        print("2. Modify existing invoice")
+        print("3. Delete invoice")
+        print("4. View invoices by category")
+        print("5. Reset invoice number counter")
+        print("6. Exit")
+        choice = input("Enter choice (1-6): ")
+        
+        if choice == "1":
+            company = get_company_details()
+            customers = get_customer_details()
+            if not customers:
+                print("At least one customer with items is required. Invoice not generated.")
+                continue
+            if not any(customer["items"] for customer in customers):
+                print("At least one item is required. Invoice not generated.")
+                continue
+            invoice_date = get_invoice_date()
+            invoice_number = get_next_invoice_number()
+            create_invoice(company, customers, invoice_number, invoice_date, manager)
+            print(f"Invoice generated and stored: invoice_{invoice_number}.pdf")
+        elif choice == "2":
+            modify_invoice(manager)
+        elif choice == "3":
+            delete_invoice(manager)
+        elif choice == "4":
+            display_categorized_invoices(manager)
+        elif choice == "5":
+            reset_invoice_number(manager)
+        elif choice == "6":
+            print("Exiting...")
+            break
+        else:
+            print("Invalid choice. Please try again.")
+
+if __name__ == "__main__":
+    main_menu()

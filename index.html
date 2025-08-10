@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Invoice Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f3f4f6;
+        }
+    </style>
+</head>
+<body class="container mx-auto p-4">
+    <h1 class="text-3xl font-bold text-center mb-6">Simple Invoice Manager</h1>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Create/Modify Invoice Section -->
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-xl font-semibold mb-4">Create or Modify Invoice</h2>
+            <div id="invoiceForm">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium">Company Name</label>
+                    <input type="text" id="companyName" class="mt-1 p-2 w-full border rounded-md" placeholder="Enter company name">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium">Company Address</label>
+                    <input type="text" id="companyAddress" class="mt-1 p-2 w-full border rounded-md" placeholder="Enter company address">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium">Company Email</label>
+                    <input type="email" id="companyEmail" class="mt-1 p-2 w-full border rounded-md" placeholder="Enter company email">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium">Invoice Date (YYYY-MM-DD)</label>
+                    <input type="text" id="invoiceDate" class="mt-1 p-2 w-full border rounded-md" placeholder="YYYY-MM-DD" pattern="\d{4}-\d{2}-\d{2}">
+                </div>
+                <div id="customers" class="mb-4">
+                    <!-- Customer fields will be dynamically added here -->
+                </div>
+                <button onclick="addCustomer()" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">Add Customer</button>
+                <div class="mt-4 flex space-x-4">
+                    <button onclick="createInvoice()" class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600">Create Invoice</button>
+                    <button onclick="loadInvoice()" class="bg-yellow-500 text-white px-4 py-2 rounded-md hover:bg-yellow-600">Load Invoice</button>
+                    <button onclick="modifyInvoice()" class="bg-purple-500 text-white px-4 py-2 rounded-md hover:bg-purple-600">Modify Invoice</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Delete Invoice Section -->
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-xl font-semibold mb-4">Delete Invoice</h2>
+            <div class="mb-4">
+                <label class="block text-sm font-medium">Invoice Number</label>
+                <input type="number" id="deleteInvoiceNumber" class="mt-1 p-2 w-full border rounded-md" placeholder="Enter invoice number">
+            </div>
+            <button onclick="deleteInvoice()" class="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600">Delete</button>
+        </div>
+
+        <!-- View Invoices Section -->
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-xl font-semibold mb-4">View Invoices</h2>
+            <div class="mb-4">
+                <label class="block text-sm font-medium">Categorize By</label>
+                <select id="viewPeriod" class="mt-1 p-2 w-full border rounded-md">
+                    <option value="year">Year</option>
+                    <option value="month" selected>Month</option>
+                    <option value="day">Day</option>
+                </select>
+            </div>
+            <button onclick="viewInvoices()" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">View Invoices</button>
+            <table id="invoicesTable" class="mt-4 w-full border-collapse">
+                <thead>
+                    <tr class="bg-gray-200">
+                        <th class="p-2 border">Period</th>
+                        <th class="p-2 border">Invoice #</th>
+                        <th class="p-2 border">Date</th>
+                        <th class="p-2 border">Customers</th>
+                        <th class="p-2 border">Total</th>
+                        <th class="p-2 border">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="invoicesTableBody"></tbody>
+            </table>
+        </div>
+
+        <!-- Reset Invoice Number Section -->
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-xl font-semibold mb-4">Reset Invoice Number</h2>
+            <button onclick="resetInvoiceNumber()" class="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600">Reset Counter</button>
+        </div>
+    </div>
+
+    <script>
+        let invoices = JSON.parse(localStorage.getItem('invoices')) || [];
+        let lastInvoiceNumber = parseInt(localStorage.getItem('lastInvoiceNumber')) || 1000;
+
+        function addCustomer(customer = { name: '', address: '', email: '', items: [] }) {
+            const customerDiv = document.createElement('div');
+            customerDiv.className = 'customer mb-4 p-4 border rounded-md';
+            customerDiv.innerHTML = `
+                <div class="mb-2">
+                    <label class="block text-sm font-medium">Customer Name</label>
+                    <input type="text" class="customer-name mt-1 p-2 w-full border rounded-md" value="${customer.name}" placeholder="Enter customer name">
+                </div>
+                <div class="mb-2">
+                    <label class="block text-sm font-medium">Customer Address</label>
+                    <input type="text" class="customer-address mt-1 p-2 w-full border rounded-md" value="${customer.address}" placeholder="Enter customer address">
+                </div>
+                <div class="mb-2">
+                    <label class="block text-sm font-medium">Customer Email</label>
+                    <input type="email" class="customer-email mt-1 p-2 w-full border rounded-md" value="${customer.email}" placeholder="Enter customer email">
+                </div>
+                <div class="items mb-2">
+                    <h3 class="text-sm font-medium">Items</h3>
+                    <div class="items-container"></div>
+                </div>
+                <button onclick="addItem(this.parentElement)" class="bg-blue-300 text-white px-2 py-1 rounded-md hover:bg-blue-400">Add Item</button>
+                <button onclick="this.parentElement.remove()" class="bg-red-300 text-white px-2 py-1 rounded-md hover:bg-red-400">Remove Customer</button>
+            `;
+            document.getElementById('customers').appendChild(customerDiv);
+            customer.items.forEach(item => addItem(customerDiv, item));
+        }
+
+        function addItem(customerDiv, item = { description: '', quantity: 1, unit_price: 0 }) {
+            const itemsContainer = customerDiv.querySelector('.items-container');
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'item flex space-x-2 mb-2';
+            itemDiv.innerHTML = `
+                <input type="text" class="item-description p-2 w-1/3 border rounded-md" value="${item.description}" placeholder="Description">
+                <input type="number" class="item-quantity p-2 w-1/6 border rounded-md" value="${item.quantity}" placeholder="Quantity" min="1">
+                <input type="number" class="item-unit-price p-2 w-1/6 border rounded-md" quite="${item.unit_price}" placeholder="Unit Price" step="0.01">
+                <button onclick="this.parentElement.remove()" class="bg-red-300 text-white px-2 py-1 rounded-md hover:bg-red-400">Remove</button>
+            `;
+            itemsContainer.appendChild(itemDiv);
+        }
+
+        function collectInvoiceData() {
+            const company = {
+                name: document.getElementById('companyName').value,
+                address: document.getElementById('companyAddress').value,
+                email: document.getElementById('companyEmail').value
+            };
+            const invoiceDate = document.getElementById('invoiceDate').value;
+            if (!invoiceDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                alert('Please enter a valid date (YYYY-MM-DD).');
+                return null;
+            }
+            const customers = [];
+            document.querySelectorAll('.customer').forEach(customerDiv => {
+                const items = [];
+                customerDiv.querySelectorAll('.item').forEach(itemDiv => {
+                    const quantity = parseInt(itemDiv.querySelector('.item-quantity').value) || 1;
+                    const unit_price = parseFloat(itemDiv.querySelector('.item-unit-price').value) || 0;
+                    if (itemDiv.querySelector('.item-description').value) {
+                        items.push({
+                            description: itemDiv.querySelector('.item-description').value,
+                            quantity: quantity,
+                            unit_price: unit_price
+                        });
+                    }
+                });
+                if (items.length) {
+                    customers.push({
+                        name: customerDiv.querySelector('.customer-name').value,
+                        address: customerDiv.querySelector('.customer-address').value,
+                        email: customerDiv.querySelector('.customer-email').value,
+                        items: items
+                    });
+                }
+            });
+            return { company, customers, invoiceDate };
+        }
+
+        function createInvoice() {
+            const data = collectInvoiceData();
+            if (!data || !data.company.name || !data.customers.length) {
+                alert('Please fill in company details and add at least one customer with items.');
+                return;
+            }
+            lastInvoiceNumber++;
+            const total_amount = data.customers.reduce((sum, c) => sum + c.items.reduce((s, i) => s + i.quantity * i.unit_price, 0), 0);
+            const invoice = {
+                invoice_number: lastInvoiceNumber,
+                creation_date: data.invoiceDate,
+                company_name: data.company.name,
+                total_amount: total_amount,
+                customers: data.customers
+            };
+            invoices.push(invoice);
+            localStorage.setItem('invoices', JSON.stringify(invoices));
+            localStorage.setItem('lastInvoiceNumber', lastInvoiceNumber);
+            alert(`Invoice ${lastInvoiceNumber} created successfully.`);
+            document.getElementById('invoiceForm').reset();
+            document.getElementById('customers').innerHTML = '';
+        }
+
+        function loadInvoice() {
+            const invoiceNumber = prompt('Enter invoice number to load:');
+            if (!invoiceNumber) return;
+            const invoice = invoices.find(inv => inv.invoice_number === parseInt(invoiceNumber));
+            if (!invoice) {
+                alert('Invoice not found.');
+                return;
+            }
+            document.getElementById('companyName').value = invoice.company_name;
+            document.getElementById('companyAddress').value = '';
+            document.getElementById('companyEmail').value = '';
+            document.getElementById('invoiceDate').value = invoice.creation_date;
+            document.getElementById('customers').innerHTML = '';
+            invoice.customers.forEach(customer => addCustomer(customer));
+        }
+
+        function modifyInvoice() {
+            const invoiceNumber = prompt('Enter invoice number to modify:');
+            if (!invoiceNumber) return;
+            const index = invoices.findIndex(inv => inv.invoice_number === parseInt(invoiceNumber));
+            if (index === -1) {
+                alert('Invoice not found.');
+                return;
+            }
+            const data = collectInvoiceData();
+            if (!data || !data.company.name || !data.customers.length) {
+                alert('Please fill in company details and add at least one customer with items.');
+                return;
+            }
+            const total_amount = data.customers.reduce((sum, c) => sum + c.items.reduce((s, i) => s + i.quantity * i.unit_price, 0), 0);
+            invoices[index] = {
+                invoice_number: parseInt(invoiceNumber),
+                creation_date: data.invoiceDate,
+                company_name: data.company.name,
+                total_amount: total_amount,
+                customers: data.customers
+            };
+            localStorage.setItem('invoices', JSON.stringify(invoices));
+            alert(`Invoice ${invoiceNumber} modified successfully.`);
+            document.getElementById('invoiceForm').reset();
+            document.getElementById('customers').innerHTML = '';
+        }
+
+ Документ: index.html (продолжение)
+
+        function deleteInvoice() {
+            const invoiceNumber = document.getElementById('deleteInvoiceNumber').value;
+            if (!invoiceNumber) {
+                alert('Please enter an invoice number.');
+                return;
+            }
+            const index = invoices.findIndex(inv => inv.invoice_number === parseInt(invoiceNumber));
+            if (index === -1) {
+                alert('Invoice not found.');
+                return;
+            }
+            invoices.splice(index, 1);
+            localStorage.setItem('invoices', JSON.stringify(invoices));
+            alert(`Invoice ${invoiceNumber} deleted successfully.`);
+            document.getElementById('deleteInvoiceNumber').value = '';
+        }
+
+        function viewInvoices() {
+            const period = document.getElementById('viewPeriod').value;
+            const categorized = {};
+            invoices.forEach(invoice => {
+                const date = new Date(invoice.creation_date);
+                let key;
+                if (period === 'year') {
+                    key = date.getFullYear().toString();
+                } else if (period === 'month') {
+                    key = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+                } else {
+                    key = invoice.creation_date;
+                }
+                if (!categorized[key]) categorized[key] = [];
+                categorized[key].push(invoice);
+            });
+            const tbody = document.getElementById('invoicesTableBody');
+            tbody.innerHTML = '';
+            for (const [periodKey, periodInvoices] of Object.entries(categorized)) {
+                periodInvoices.forEach(invoice => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td class="p-2 border">${periodKey}</td>
+                        <td class="p-2 border">${invoice.invoice_number}</td>
+                        <td class="p-2 border">${invoice.creation_date}</td>
+                        <td class="p-2 border">${invoice.customers.map(c => `${c.name} (${c.items.length} items)`).join(', ')}</td>
+                        <td class="p-2 border">$${invoice.total_amount.toFixed(2)}</td>
+                        <td class="p-2 border">
+                            <button onclick="loadInvoiceForEdit(${invoice.invoice_number})" class="bg-yellow-500 text-white px-2 py-1 rounded-md hover:bg-yellow-600">Edit</button>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            }
+        }
+
+        function loadInvoiceForEdit(invoiceNumber) {
+            const invoice = invoices.find(inv => inv.invoice_number === parseInt(invoiceNumber));
+            if (!invoice) {
+                alert('Invoice not found.');
+                return;
+            }
+            document.getElementById('companyName').value = invoice.company_name;
+            document.getElementById('companyAddress').value = '';
+            document.getElementById('companyEmail').value = '';
+            document.getElementById('invoiceDate').value = invoice.creation_date;
+            document.getElementById('customers').innerHTML = '';
+            invoice.customers.forEach(customer => addCustomer(customer));
+        }
+
+        function resetInvoiceNumber() {
+            lastInvoiceNumber = invoices.length ? Math.max(...invoices.map(inv => inv.invoice_number)) : 1000;
+            localStorage.setItem('lastInvoiceNumber', lastInvoiceNumber);
+            alert('Invoice number counter reset successfully.');
+        }
+    </script>
+</body>
+</html>
