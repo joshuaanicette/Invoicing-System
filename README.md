@@ -17,8 +17,11 @@ Deployment: Hosted on Vercel’s free tier for accessible, real-time invoice acc
 Prerequisites
 
 Python 3.8+: For running the backend scripts.
+
 Git: For version control.
+
 Vercel Account: For deploying the frontend.
+
 Dependencies: Install via requirements.txt (e.g., reportlab for PDF generation, sqlite3).
 
 Installation
