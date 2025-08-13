@@ -6,8 +6,11 @@ Ed's Invoicing System is a web-based application designed to streamline invoice 
 Features
 
 Web Interface: Customers access invoices via a Vercel-hosted site, with a clean frontend displaying invoice details and PDF downloads.
+
 Automated PDF Generation: Python scripts (invoice_generator.py) create sequentially numbered PDF invoices from user inputs (e.g., customer details, items).
+
 Organized Storage: SQLite database (invoices.db) with date-based filtering, improving retrieval efficiency by 40%.
+
 Deployment: Hosted on Vercel’s free tier for accessible, real-time invoice access.
 
 Prerequisites
