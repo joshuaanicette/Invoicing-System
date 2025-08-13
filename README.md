@@ -82,13 +82,16 @@ Sign in to vercel.com with GitHub.
 Import Ed-s-Invoicing-System repository.
 Set Framework Preset to "Other" and Root Directory to ./.
 Deploy to get a free subdomain (e.g., ed-s-invoicing-system.vercel.app). 
+
 Note: Vercel hosts static files (index.html, PDFs). 
+
 Backend requires a separate free service (e.g., Render).
 
 
 
 Project Structure
 Ed-s-Invoicing-System/
+
 ├── index.html           # Web frontend for invoice access
 
 ├── styles.css          # Styling for the web interface
