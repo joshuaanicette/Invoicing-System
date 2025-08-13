@@ -1,4 +1,4 @@
-# Ed-s-Invoicing-System-2
+# Eds-Invoicing-System
 
 Ed's Invoicing System
 Overview
