@@ -3,6 +3,7 @@
 Ed's Invoicing System
 Overview
 Ed's Invoicing System is a web-based application designed to streamline invoice creation and management for small businesses. It features a user-friendly frontend (HTML/CSS) for customers to view and download PDF invoices and a robust Python backend with SQLite for automated invoice generation and organized storage. The system supports 20+ monthly customers, generating 10+ invoices with a 30% reduction in processing time and 25% fewer errors compared to manual methods.
+
 Features
 
 Web Interface: Customers access invoices via a Vercel-hosted site, with a clean frontend displaying invoice details and PDF downloads.
