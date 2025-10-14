@@ -34,9 +34,12 @@ cd ed-invoicing-system
 ``
 
 Install Frontend Dependencies:
+
+
 ``bash
 npm install
 ``
+
 or
 
 ``bash
