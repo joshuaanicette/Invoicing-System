@@ -55,12 +55,14 @@ FLASK_ENV=development
 ``
 
 Initialize the Database:Ensure the SQLite database (invoices.db) is set up. If your Flask app includes an initialization script:
+
 ``bash 
 python init_db.py
 ``
 Or manually create the database tables as per your Flask app's setup.
 
 Run the Backend:
+
 ``bash
 python app.py
 ``
@@ -68,6 +70,7 @@ python app.py
 The Flask backend will typically run on http://localhost:5000.
 
 Run the Frontend:In a separate terminal:
+
 ``bash
 npm run dev
 ``
