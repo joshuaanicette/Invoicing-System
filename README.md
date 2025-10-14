@@ -75,6 +75,7 @@ Run the Frontend:In a separate terminal:
 ``bash
 npm run dev
 ``
+
 or
 
 ``bash
