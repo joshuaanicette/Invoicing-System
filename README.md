@@ -28,42 +28,54 @@ A Vercel account for deployment (optional)
 Installation
 
 Clone the Repository:
+``bash
 git clone https://github.com/your-username/ed-invoicing-system.git
 cd ed-invoicing-system
-
+``
 
 Install Frontend Dependencies:
+``bash
 npm install
-
+``
 or
+``bash
 yarn install
+``
 
-
-Install Backend Dependencies:Assuming a requirements.txt file for Flask and SQLite:
+Install Backend Dependencies: Assuming a requirements.txt file for Flask and SQLite:
+``bash
 pip install -r requirements.txt
+``
 
-
-Configure Environment Variables:Create a .env file in the root directory and add necessary variables (e.g., database path, API keys). Example:
+Configure Environment Variables: Create a .env file in the root directory and add necessary variables (e.g., database path, API keys). Example:
+``bash
 DATABASE_URL=sqlite:///invoices.db
 API_KEY=your_api_key
 FLASK_ENV=development
-
+``
 
 Initialize the Database:Ensure the SQLite database (invoices.db) is set up. If your Flask app includes an initialization script:
+``bash 
 python init_db.py
-
+``
 Or manually create the database tables as per your Flask app's setup.
 
 Run the Backend:
+``bash
 python app.py
+``
 
 The Flask backend will typically run on http://localhost:5000.
 
 Run the Frontend:In a separate terminal:
+``bash
 npm run dev
-
+``
 or
+
+``bash
 yarn dev
+``
 
 The frontend will be available at http://localhost:3000.
 
