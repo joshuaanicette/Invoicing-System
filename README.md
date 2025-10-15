@@ -93,9 +93,14 @@ To deploy on Vercel:
 
 Push your code to a GitHub repository.
 For the frontend, connect the repository to Vercel via the Vercel dashboard.
+
 For the Flask backend with SQLite, deploy to a platform supporting Python and persistent storage (e.g., Heroku, Render, or a Vercel serverless setup with adjustments for SQLite).
+
 Configure environment variables in Vercel or your backend hosting platform (e.g., DATABASE_URL=sqlite:///invoices.db).
-Deploy the app, and access it at a URL like https://ed-s-invoicing-system-2.vercel.app/.Note: SQLite may require special consideration for deployment (e.g., persistent storage or switching to a cloud database like PostgreSQL for production).
+
+Deploy the app, and access it at a URL like https://ed-s-invoicing-system-2.vercel.app/ 
+
+Note: SQLite may require special consideration for deployment (e.g., persistent storage or switching to a cloud database like PostgreSQL for production).
 
 Usage
 
